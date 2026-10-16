@@ -39,7 +39,14 @@ class Edgar:
         self._last = 0.0
 
     def get(self, url: str) -> requests.Response | None:
-        """GET with rate limiting and retries. Returns None on 404."""
+        """GET with rate limiting and retries.
+
+        Returns None when the file doesn't exist. EDGAR's archive answers a
+        missing file (e.g. the daily index for a holiday) with 403
+        AccessDenied rather than 404, so both count as missing. A 403 that
+        says the request came from an undeclared tool means our User-Agent
+        was rejected, and that is a real error.
+        """
         for attempt in range(5):
             wait = self.min_interval - (time.monotonic() - self._last)
             if wait > 0:
@@ -52,6 +59,16 @@ class Edgar:
                 continue
             if r.status_code == 404:
                 return None
+            if r.status_code == 403:
+                body = r.text[:2000]
+                if "Undeclared Automated Tool" in body:
+                    raise SystemExit(
+                        "SEC rejected the User-Agent. Set SEC_USER_AGENT to "
+                        '"Your Name your@email.com".')
+                if "Request Rate Threshold" in body:
+                    time.sleep(60 * (attempt + 1))
+                    continue
+                return None  # S3 AccessDenied: the file doesn't exist
             if r.status_code in (429, 500, 502, 503, 504):
                 time.sleep(2 ** attempt * 2)
                 continue

@@ -11,8 +11,11 @@ exists, so re-running is cheap and safe.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import sys
+
+print = functools.partial(print, flush=True)  # show progress live in CI logs
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -36,9 +39,19 @@ def update(days_back: int, max_filings: int | None) -> None:
         out = DAYS_DIR / f"{day.isoformat()}.json"
         if out.exists() or day.weekday() >= 5:
             continue
-        filings = sec.form4_paths(day)
+        try:
+            filings = sec.form4_paths(day)
+        except SystemExit:
+            raise
+        except Exception as e:  # skip the day; the next run retries it
+            print(f"{day}: couldn't read the daily index ({e}); will retry next run")
+            continue
         if not filings:
-            print(f"{day}: no index yet (holiday, or SEC hasn't published it)")
+            if (today - day).days > 4:  # long past: an SEC holiday, so remember it
+                out.write_text("[]")
+                print(f"{day}: no filings (SEC holiday)")
+            else:
+                print(f"{day}: no index yet (holiday, or SEC hasn't published it)")
             continue
         if max_filings:
             filings = filings[:max_filings]
