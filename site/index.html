@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Insider Buys</title>
+<meta name="description" content="Which company executives and directors are buying their own stock, from SEC Form 4 filings, updated every weekday.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #EEF2F4;
+  --sheet: #FFFFFF;
+  --ink: #1B2A3A;
+  --ink-soft: #55657A;
+  --rule: #C9D3DC;
+  --form: #2F5D8C;
+  --buy: #23704A;
+  --buy-tint: #DCEFE3;
+  --sell: #A33B2A;
+  --sell-tint: #F5E1DC;
+  --mid: #8A6A12;
+  --mid-tint: #F4EBCF;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141C25; --sheet: #1B2531; --ink: #E4EAF0; --ink-soft: #9AA9B9;
+    --rule: #2E3B4A; --form: #8DB4DD; --buy: #6CCB97; --buy-tint: #1D3A2B;
+    --sell: #EE8F7D; --sell-tint: #3E2420; --mid: #E2C26B; --mid-tint: #3A3120;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141C25; --sheet: #1B2531; --ink: #E4EAF0; --ink-soft: #9AA9B9;
+  --rule: #2E3B4A; --form: #8DB4DD; --buy: #6CCB97; --buy-tint: #1D3A2B;
+  --sell: #EE8F7D; --sell-tint: #3E2420; --mid: #E2C26B; --mid-tint: #3A3120;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 16px/1.5 "Public Sans", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+a { color: var(--form); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid var(--form); outline-offset: 2px; border-radius: 4px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+
+header.top { border-bottom: 1px solid var(--rule); }
+header.top .wrap { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-top: 18px; padding-bottom: 14px; flex-wrap: wrap; }
+.brand { font-weight: 800; font-size: 1.15rem; letter-spacing: -0.01em; text-decoration: none; color: var(--ink); }
+.updated { color: var(--ink-soft); font-size: .875rem; }
+
+.sample { background: var(--mid-tint); color: var(--ink); font-size: .9rem; }
+.sample .wrap { padding-top: 10px; padding-bottom: 10px; }
+
+.intro { padding: 48px 0 8px; }
+.intro h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.05; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; max-width: 18ch; }
+.intro p { color: var(--ink-soft); max-width: 60ch; margin: 0; font-size: 1.05rem; }
+.intro p strong { color: var(--ink); font-weight: 600; }
+
+/* Clusters: the tally is the centrepiece */
+.clusters { margin: 40px 0 8px; }
+.clusters h2, .ledger h2 { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 4px; }
+.sub { color: var(--ink-soft); margin: 0 0 20px; font-size: .95rem; max-width: 62ch; }
+.cluster-list { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
+.cluster { display: grid; grid-template-columns: minmax(150px, 1.1fr) 2fr auto; gap: 8px 24px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--rule); }
+.cluster .who { min-width: 0; }
+.ticker { font-weight: 800; font-size: 1.35rem; letter-spacing: .01em; }
+.company { color: var(--ink-soft); font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tally { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.mark { width: 10px; height: 34px; background: var(--buy); border-radius: 2px; transform-origin: bottom; }
+.tally-label { margin-left: 10px; font-weight: 600; }
+.cluster .names { grid-column: 2 / 4; color: var(--ink-soft); font-size: .875rem; }
+.cluster .amount { font-weight: 600; text-align: right; white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) {
+  .loaded .mark { animation: rise .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 70ms + var(--row) * 90ms); }
+  @keyframes rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+}
+
+/* Ledger */
+.ledger { margin: 56px 0 64px; }
+.tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--ink); margin-top: 16px; }
+.tab { font: inherit; font-weight: 600; background: none; border: 0; color: var(--ink-soft); padding: 10px 14px; cursor: pointer; border-radius: 6px 6px 0 0; }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; padding: 16px 0; }
+.filters label { display: grid; gap: 4px; font-size: .8rem; color: var(--ink-soft); font-weight: 500; }
+.filters input, .filters select { font: inherit; font-size: .95rem; color: var(--ink); background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px; min-width: 0; }
+.filters input { width: 140px; }
+.count { margin-left: auto; color: var(--ink-soft); font-size: .875rem; padding-bottom: 8px; }
+
+table { width: 100%; border-collapse: collapse; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+th { text-align: left; font-size: .8rem; font-weight: 600; color: var(--ink-soft); padding: 10px 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td { padding: 12px; border-bottom: 1px solid var(--rule); vertical-align: top; font-size: .95rem; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+.t-ticker { font-weight: 800; }
+.t-company, .t-role, .t-date { color: var(--ink-soft); font-size: .85rem; }
+.t-insider { font-weight: 500; }
+.badge { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.s-High { background: var(--buy-tint); color: var(--buy); }
+.s-Medium { background: var(--mid-tint); color: var(--mid); }
+.s-Low { background: transparent; color: var(--ink-soft); border: 1px solid var(--rule); }
+.s-sell { background: var(--sell-tint); color: var(--sell); }
+.reasons { margin: 6px 0 0; padding: 0; list-style: none; font-size: .82rem; color: var(--ink-soft); }
+.reasons li::before { content: "+ "; color: var(--buy); font-weight: 600; }
+.reasons li.neg::before { content: "– "; color: var(--sell); }
+.up { color: var(--buy); }
+.empty { padding: 32px; text-align: center; color: var(--ink-soft); background: var(--sheet); border: 1px dashed var(--rule); border-radius: 8px; }
+
+footer { border-top: 1px solid var(--rule); color: var(--ink-soft); font-size: .85rem; }
+footer .wrap { padding-top: 20px; padding-bottom: 40px; max-width: 1080px; }
+footer p { max-width: 75ch; margin: 0 0 8px; }
+
+@media (max-width: 720px) {
+  .cluster { grid-template-columns: 1fr auto; }
+  .cluster .tally { grid-column: 1 / 3; order: 3; }
+  .cluster .names { grid-column: 1 / 3; order: 4; }
+  table, thead, tbody, tr, td { display: block; }
+  thead { display: none; }
+  table { border: 0; background: none; }
+  tr { background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; margin-bottom: 10px; padding: 12px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+  td { padding: 0; border: 0; }
+  td.num { text-align: right; }
+  td[data-col="insider"], td[data-col="why"] { grid-column: 1 / 3; }
+  td[data-col="change"], td[data-col="dates"] { font-size: .85rem; }
+  .filters input { width: 100%; }
+  .filters label { flex: 1 1 140px; }
+  .count { width: 100%; margin: 0; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./">Insider Buys</a>
+  <span class="updated" id="updated"></span>
+</div></header>
+<div class="sample" id="sample" hidden><div class="wrap">This preview uses sample data for made-up companies. Real filings appear once the site is running on GitHub.</div></div>
+
+<main class="wrap">
+  <section class="intro">
+    <h1>Who's buying their own company's stock</h1>
+    <p id="summary">Executives and directors must report their trades to the SEC within two business days. We read every filing and highlight the purchases worth a closer look.</p>
+  </section>
+
+  <section class="clusters" aria-labelledby="clusters-h">
+    <h2 id="clusters-h">Several insiders buying the same stock</h2>
+    <p class="sub">Three or more different insiders bought on the open market in the past 30 days. Each mark is one person.</p>
+    <ol class="cluster-list" id="clusters"></ol>
+  </section>
+
+  <section class="ledger" aria-labelledby="ledger-h">
+    <h2 id="ledger-h">Recent trades</h2>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-view="notable">Notable buys</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="all">All buys</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="sells">Largest sells</button>
+    </div>
+    <div class="filters">
+      <label>Ticker or name<input id="q" type="search" placeholder="e.g. NWRB" autocomplete="off"></label>
+      <label>Role<select id="role">
+        <option value="">Anyone</option><option value="top">CEO or CFO</option>
+        <option value="officer">Any officer</option><option value="Director">Directors</option>
+      </select></label>
+      <label>Minimum value<select id="minv">
+        <option value="0">Any amount</option><option value="50000">$50K+</option>
+        <option value="250000">$250K+</option><option value="1000000">$1M+</option>
+      </select></label>
+      <span class="count" id="count"></span>
+    </div>
+    <div id="table"></div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <p>Data comes from Form 4 filings on SEC EDGAR, updated every weekday morning. Open-market purchases and sales only; option exercises, grants and gifts are left out.</p>
+  <p>This is information, not investment advice. Insiders buy for many reasons, and a purchase doesn't mean the stock will rise.</p>
+</div></footer>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const money = (v) => v >= 1e9 ? `$${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `$${Math.round(v/1e3)}K` : `$${Math.round(v)}`;
+  const day = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const title = (s) => esc(s);
+  const price = (p) => p == null ? "–" : `$${p.toFixed(2)}`;
+  const secUrl = (t) => `https://www.sec.gov/Archives/edgar/data/${t.issuer_cik}/${t.accession.replace(/-/g, "")}/${t.accession}-index.htm`;
+  let data, view = "notable";
+
+  function renderClusters() {
+    const list = $("#clusters");
+    if (!data.clusters.length) {
+      list.innerHTML = `<li class="empty">No stocks have three or more insiders buying right now. Check the notable buys below.</li>`;
+      return;
+    }
+    list.innerHTML = data.clusters.slice(0, 8).map((c, row) => `
+      <li class="cluster">
+        <div class="who"><div class="ticker">${esc(c.ticker)}</div><div class="company">${esc(c.company)}</div></div>
+        <div class="tally" aria-label="${c.insider_count} insiders bought">
+          ${c.insiders.map((_, i) => `<span class="mark" style="--i:${i};--row:${row}"></span>`).join("")}
+          <span class="tally-label">${c.insider_count} insiders</span>
+        </div>
+        <div class="amount">${money(c.total_value)}</div>
+        <div class="names">${c.insiders.slice(0, 4).map(i => `${title(i.name)} (${esc(i.role)})`).join(", ")}${c.insiders.length > 4 ? `, and ${c.insiders.length - 4} more` : ""}. Bought ${day(c.first_date)} to ${day(c.last_date)}.</div>
+      </li>`).join("");
+  }
+
+  function rows() {
+    const q = $("#q").value.trim().toLowerCase();
+    const role = $("#role").value, minv = +$("#minv").value;
+    let src = view === "sells" ? data.top_sells : data.buys;
+    if (view === "notable") src = src.filter(t => t.strength !== "Low");
+    return src.filter(t =>
+      (!q || t.ticker.toLowerCase().includes(q) || t.company.toLowerCase().includes(q) || t.insider.toLowerCase().includes(q)) &&
+      (!role || (role === "top" ? ["CEO","CFO"].includes(t.role) : role === "officer" ? !["Director","10% owner","Other"].includes(t.role) : t.role === role)) &&
+      t.value >= minv);
+  }
+
+  function renderTable() {
+    const list = rows(), sells = view === "sells";
+    $("#count").textContent = `${list.length.toLocaleString()} ${sells ? "sells" : "buys"}`;
+    if (!list.length) {
+      $("#table").innerHTML = `<div class="empty">No trades match these filters. Try a lower minimum value or a different role.</div>`;
+      return;
+    }
+    $("#table").innerHTML = `<table>
+      <thead><tr><th>Stock</th><th>Insider</th><th class="num">Value</th><th class="num">Holdings</th><th>${sells ? "Plan" : "Signal"}</th><th>Traded / filed</th></tr></thead>
+      <tbody>${list.slice(0, 300).map(t => `<tr>
+        <td data-col="stock"><div class="t-ticker">${esc(t.ticker)}</div><div class="t-company">${esc(t.company)}</div></td>
+        <td data-col="insider"><div class="t-insider">${title(t.insider)}</div><div class="t-role">${esc(t.title || t.role)}</div></td>
+        <td class="num" data-col="value"><strong>${money(t.value)}</strong><div class="t-date">${t.shares.toLocaleString()} sh @ ${price(t.avg_price)}</div></td>
+        <td class="num" data-col="change">${t.new_position ? `<span class="up">New position</span>` : t.holding_change_pct == null ? "–" : `<span class="${sells ? "" : "up"}">${sells ? "−" : "+"}${t.holding_change_pct}%</span>`}</td>
+        <td data-col="why">${sells
+          ? `<span class="badge s-sell">${t.plan_10b5_1 ? "Pre-scheduled" : "Not pre-scheduled"}</span>`
+          : `<span class="badge s-${t.strength}">${t.strength}</span><ul class="reasons">${t.reasons.map(r => `<li class="${/scheduled|indirectly/i.test(r) ? "neg" : ""}">${esc(r)}</li>`).join("")}</ul>`}</td>
+        <td data-col="dates" class="t-date">${day(t.trade_date)} / <a href="${secUrl(t)}" target="_blank" rel="noopener">${day(t.filed)}</a></td>
+      </tr>`).join("")}</tbody></table>`;
+  }
+
+  function init(d) {
+    data = d;
+    $("#sample").hidden = !d.sample;
+    $("#updated").textContent = `Updated ${new Date(d.generated_at + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`;
+    const s = d.stats;
+    $("#summary").innerHTML = `In the past ${d.window_days} days, insiders made <strong>${s.buy_count.toLocaleString()} open-market purchases worth ${money(s.buy_value)}</strong>. ${s.high_signal_buys} stand out as high signal. Executives and directors must report trades to the SEC within two business days.`;
+    renderClusters();
+    renderTable();
+    requestAnimationFrame(() => document.body.classList.add("loaded"));
+  }
+
+  document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
+    view = b.dataset.view;
+    document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === b));
+    renderTable();
+  }));
+  ["#q", "#role", "#minv"].forEach(s => $(s).addEventListener("input", renderTable));
+
+  if (window.__INSIDER_DATA__) init(window.__INSIDER_DATA__);
+  else fetch("data/insiders.json").then(r => r.json()).then(init).catch(() => {
+    $("#table").innerHTML = `<div class="empty">Couldn't load trade data. Run the pipeline to create data/insiders.json.</div>`;
+  });
+})();
+</script>
+</body>
+</html>
