@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import functools
 import json
+import os
 import sys
 
 print = functools.partial(print, flush=True)  # show progress live in CI logs
@@ -82,6 +83,7 @@ def load_rows(window_days: int) -> list[dict]:
 
 
 CLUSTER_PAD = 31  # look back further so clusters near the window edge still count
+PAGE_WINDOW = 90  # stock pages show the last 90 days of trades
 
 
 def write_site_data(data: dict) -> None:
@@ -120,6 +122,10 @@ def main() -> None:
         update(a.days, a.max_filings)
     elif a.cmd == "build":
         write_site_data(build_site_data(load_rows(a.window), date.today(), a.window))
+        from .pages import build_pages
+        n = build_pages(load_rows(PAGE_WINDOW), date.today(), ROOT / "site",
+                        os.environ.get("SITE_URL", "https://insidercluster.net"), PAGE_WINDOW)
+        print(f"Wrote {n} stock pages, the A-Z list and sitemap.xml")
     else:
         demo(a.folder, date.fromisoformat(a.as_of))
 

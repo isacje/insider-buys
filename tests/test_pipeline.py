@@ -177,3 +177,28 @@ def test_cluster_needs_three_insiders():
 
     data2 = build_site_data(rows[: len(base) * 2], date(2026, 10, 15))
     assert data2["clusters"] == []
+
+
+def test_stock_pages(tmp_path=None):
+    import tempfile
+    from pathlib import Path
+    from pipeline.pages import build_pages
+    out = Path(tmp_path or tempfile.mkdtemp())
+    base = parse_form4(FORM4, "a", "2026-10-15")
+    rows = []
+    for i in range(3):  # a real cluster: different people, days and prices
+        for r in base:
+            rows.append({**r, "accession": f"a{i}", "insider_cik": str(i), "insider": f"Person {i}",
+                         "date": f"2026-10-1{i}", "price": r["price"] + i,
+                         "value": r["shares"] * (r["price"] + i)})
+    rows.append({**base[0], "ticker": "../ETC", "accession": "z"})  # unsafe path is skipped
+    n = build_pages(rows, date(2026, 10, 15), out, "https://example.com", 90)
+    assert n == 1
+    page = (out / "stock" / "NWRB" / "index.html").read_text()
+    assert "<title>NWRB insider buying and selling" in page
+    assert "Cluster buying:" in page and "3 different insiders" in page
+    assert 'rel="canonical" href="https://example.com/stock/NWRB/"' in page
+    sitemap = (out / "sitemap.xml").read_text()
+    assert "https://example.com/stock/NWRB/" in sitemap and sitemap.count("<loc>") == 3
+    assert "Sitemap: https://example.com/sitemap.xml" in (out / "robots.txt").read_text()
+    assert sorted(p.name for p in (out / "stock").iterdir()) == ["NWRB", "index.html"]

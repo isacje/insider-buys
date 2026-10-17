@@ -3,3 +3,7 @@ __pycache__/
 .venv/
 site/data/
 tests/fixtures/
+site/stock/
+site/sitemap.xml
+site/robots.txt
+site/CNAME

@@ -17,7 +17,8 @@ Live at https://insidercluster.net. A free website showing which executives and 
    | Pre-scheduled 10b5-1 plan | −1 |
 
    6+ points is **High**, 4+ is **Medium**. Each buy shows the reasons behind its score.
-4. **Publish** (`site/index.html`): a single static page that reads `site/data/insiders.json`.
+4. **Publish** (`site/index.html`): the homepage, which reads `site/data/insiders.json`.
+   `pipeline/pages.py` also writes a plain-HTML page per stock (`/stock/GME/`), an A-Z list (`/stock/`), `sitemap.xml` and `robots.txt`, so search engines can index every stock.
 5. **Automate** (`.github/workflows/update.yml`): GitHub Actions runs everything each weekday morning, saves new filing days in `data/days/`, and deploys the site to GitHub Pages.
 
 ## Set it up on GitHub (about 15 minutes)
