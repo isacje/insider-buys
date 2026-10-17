@@ -1,6 +1,6 @@
-# Insider Buys
+# Insider Cluster
 
-A free website showing which executives and directors are buying their own company's stock, built from SEC Form 4 filings. It updates itself every weekday and costs nothing to run.
+Live at https://insidercluster.net. A free website showing which executives and directors are buying their own company's stock, built from SEC Form 4 filings. It updates itself every weekday and costs nothing to run.
 
 ## How it works
 

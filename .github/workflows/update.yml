@@ -5,6 +5,9 @@ on:
     # 7:15am New York time (11:15 UTC; 6:15am during winter), Tuesday-Saturday,
     # after SEC publishes the previous business day's index
     - cron: "15 11 * * 2-6"
+  push:
+    branches: [main]
+    paths: ["site/**", "pipeline/**", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       days:
