@@ -107,12 +107,70 @@ def test_group_and_score_buy():
     assert "Bought by the CEO" in b["reasons"]
 
 
+def _trade(**kw):
+    base = dict(accession="a", filed="2026-10-14", trade_date="2026-10-13", ticker="ABC",
+                company="ABC Corp", issuer_cik="1", insider="P", insider_cik="1",
+                role="Director", title="", side="buy", shares=1000, avg_price=10.0,
+                value=10000, owned_after=5000, holding_change_pct=25.0,
+                new_position=False, plan_10b5_1=False, direct=True, late_days=1)
+    base.update(kw)
+    return base
+
+
+def test_clean_ticker():
+    from pipeline.signals import clean_ticker
+    assert clean_ticker("hei, hei.a") == "HEI"
+    assert clean_ticker("N/A") == "" and clean_ticker("NONE") == "" and clean_ticker("") == ""
+    assert clean_ticker("BRK.A") == "BRK.A"
+
+
+def test_bad_price_set_aside():
+    from pipeline.signals import flag_bad_prices
+    # total typed into the price field: $2.27M deal shown as $10 trillion
+    t1 = _trade(accession="x1", ticker="SLBT", shares=4545306, avg_price=2272653.0,
+                value=4545306 * 2272653, owned_after=333832129)
+    # a real $1,345 stock with no corroboration is kept
+    t2 = _trade(accession="x2", ticker="ZZZZ", shares=30000, avg_price=1345.0,
+                value=40350000, owned_after=200000)
+    # far from what other filings say for the same stock
+    t3 = [_trade(accession=f"y{i}", insider_cik=str(i), ticker="QQQX", avg_price=4.0)
+          for i in range(3)]
+    t4 = _trade(accession="y9", insider_cik="9", ticker="QQQX", avg_price=4000.0, value=4e6)
+    bad = flag_bad_prices([t1, t2, *t3, t4])
+    assert {b["accession"] for b in bad} == {"x1", "y9"}
+
+
+def test_twin_filings_merged_but_plans_kept():
+    from pipeline.signals import group_trades
+    def rows(acc, cik, name):
+        return [{**r, "accession": acc, "insider_cik": cik, "insider": name}
+                for r in parse_form4(FORM4, acc, "2026-10-15")]
+    two = group_trades(rows("a1", "1", "Fund LP") + rows("a2", "2", "Fund GP"))
+    assert len(two) == 1 and two[0]["also_reported_by"] == "Fund GP"
+    three = group_trades(rows("a1", "1", "A") + rows("a2", "2", "B") + rows("a3", "3", "C"))
+    assert len(three) == 3
+
+
+def test_plan_purchase_not_a_cluster():
+    base = parse_form4(FORM4, "a", "2026-10-15")
+    rows = []
+    for i in range(4):  # same day, same price, four directors
+        for r in base[:1]:
+            rows.append({**r, "accession": f"p{i}", "insider_cik": str(i),
+                         "insider": f"D{i}", "shares": 100 + i, "value": (100 + i) * 40.0})
+    data = build_site_data(rows, date(2026, 10, 15))
+    assert data["clusters"] == []
+    assert all("likely a company plan" in " ".join(b["reasons"]) for b in data["buys"])
+
+
 def test_cluster_needs_three_insiders():
     base = parse_form4(FORM4, "a", "2026-10-15")
     rows = []
-    for i in range(3):
+    for i in range(3):  # three people, on different days, at different prices
         for r in base:
-            rows.append({**r, "accession": f"a{i}", "insider_cik": str(i), "insider": f"P{i}"})
+            rows.append({**r, "accession": f"a{i}", "insider_cik": str(i), "insider": f"P{i}",
+                         "date": f"2026-10-1{i}", "price": r["price"] + i,
+                         "value": r["shares"] * (r["price"] + i)})
     data = build_site_data(rows, date(2026, 10, 15))
     assert data["clusters"][0]["insider_count"] == 3
     assert all("Other insiders buying too" in b["reasons"] for b in data["buys"])

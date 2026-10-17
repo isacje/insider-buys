@@ -159,7 +159,7 @@ footer p { max-width: 75ch; margin: 0 0 8px; }
       <button class="tab" role="tab" aria-selected="false" data-view="sells">Largest sells</button>
     </div>
     <div class="filters">
-      <label>Ticker or name<input id="q" type="search" placeholder="e.g. NWRB" autocomplete="off"></label>
+      <label>Ticker or name<input id="q" type="search" placeholder="e.g. GME" autocomplete="off"></label>
       <label>Role<select id="role">
         <option value="">Anyone</option><option value="top">CEO or CFO</option>
         <option value="officer">Any officer</option><option value="Director">Directors</option>
@@ -175,7 +175,7 @@ footer p { max-width: 75ch; margin: 0 0 8px; }
 </main>
 
 <footer><div class="wrap">
-  <p>Data comes from Form 4 filings on SEC EDGAR, updated every weekday morning. Open-market purchases and sales only; option exercises, grants and gifts are left out.</p>
+  <p>Data comes from Form 4 filings on SEC EDGAR, updated every weekday morning. Open-market purchases and sales only; option exercises, grants and gifts are left out. Trades whose price per share looks mistyped in the filing are set aside, and the same trade filed twice is shown once.</p>
   <p>This is information, not investment advice. Insiders buy for many reasons, and a purchase doesn't mean the stock will rise.</p>
 </div></footer>
 
@@ -230,12 +230,12 @@ footer p { max-width: 75ch; margin: 0 0 8px; }
       <thead><tr><th>Stock</th><th>Insider</th><th class="num">Value</th><th class="num">Holdings</th><th>${sells ? "Plan" : "Signal"}</th><th>Traded / filed</th></tr></thead>
       <tbody>${list.slice(0, 300).map(t => `<tr>
         <td data-col="stock"><div class="t-ticker">${esc(t.ticker)}</div><div class="t-company">${esc(t.company)}</div></td>
-        <td data-col="insider"><div class="t-insider">${title(t.insider)}</div><div class="t-role">${esc(t.title || t.role)}</div></td>
+        <td data-col="insider"><div class="t-insider">${title(t.insider)}</div><div class="t-role">${esc(t.title || t.role)}${t.also_reported_by ? `<br>Also reported by ${esc(t.also_reported_by)}` : ""}</div></td>
         <td class="num" data-col="value"><strong>${money(t.value)}</strong><div class="t-date">${t.shares.toLocaleString()} sh @ ${price(t.avg_price)}</div></td>
         <td class="num" data-col="change">${t.new_position ? `<span class="up">New position</span>` : t.holding_change_pct == null ? "–" : `<span class="${sells ? "" : "up"}">${sells ? "−" : "+"}${t.holding_change_pct}%</span>`}</td>
         <td data-col="why">${sells
           ? `<span class="badge s-sell">${t.plan_10b5_1 ? "Pre-scheduled" : "Not pre-scheduled"}</span>`
-          : `<span class="badge s-${t.strength}">${t.strength}</span><ul class="reasons">${t.reasons.map(r => `<li class="${/scheduled|indirectly/i.test(r) ? "neg" : ""}">${esc(r)}</li>`).join("")}</ul>`}</td>
+          : `<span class="badge s-${t.strength}">${t.strength}</span><ul class="reasons">${t.reasons.map(r => `<li class="${/scheduled|indirectly|plan\)/i.test(r) ? "neg" : ""}">${esc(r)}</li>`).join("")}</ul>`}</td>
         <td data-col="dates" class="t-date">${day(t.trade_date)} / <a href="${secUrl(t)}" target="_blank" rel="noopener">${day(t.filed)}</a></td>
       </tr>`).join("")}</tbody></table>`;
   }
