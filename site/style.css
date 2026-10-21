@@ -139,3 +139,34 @@ footer p { max-width: 75ch; margin: 0 0 8px; }
 .az-letter { font-weight: 800; margin-top: 12px; color: var(--ink); }
 
 .block:last-child { margin-bottom: 64px; }
+
+/* Navigation, calls to action and content pages */
+.topnav { display: flex; gap: 18px; font-size: .95rem; }
+.topnav a { color: var(--ink); text-decoration: none; font-weight: 600; }
+.topnav a:hover { text-decoration: underline; }
+.asof { color: var(--ink-soft); font-size: .9rem; margin: 14px 0 0; }
+.asof a { color: var(--form); }
+.signup, .waitlist { margin: 48px 0 0; padding: 24px; background: var(--sheet); border: 1px solid var(--rule); border-left: 4px solid var(--form); border-radius: 0 10px 10px 0; max-width: 640px; }
+.signup h2, .waitlist h2 { font-size: 1.2rem; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.01em; }
+.signup p, .waitlist p { margin: 0 0 14px; color: var(--ink-soft); }
+.signup-form label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 6px; }
+.signup-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.signup-row input { flex: 1 1 220px; font: inherit; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.signup-row button, .copybar button, .share button { font: inherit; font-weight: 600; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); cursor: pointer; }
+.signup .fine { font-size: .8rem; margin: 10px 0 0; }
+.waitlist { border-left-color: var(--buy); }
+.promo { margin: 0 0 16px; padding: 12px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; max-width: 75ch; }
+.promo p { margin: 0; }
+.story-list { list-style: none; padding: 0; margin: 0; border-top: 2px solid var(--ink); }
+.story-list li { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.story-list li a { font-weight: 800; }
+.story-list li span { color: var(--ink-soft); }
+.more { color: var(--ink-soft); font-size: .9rem; margin: 10px 0 0; }
+.pager { display: flex; justify-content: space-between; gap: 16px; margin: 32px 0 0; flex-wrap: wrap; }
+.share label { display: block; font-weight: 600; font-size: .85rem; margin: 14px 0 4px; }
+.share textarea { width: 100%; font: .95rem/1.45 ui-monospace, Menlo, monospace; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); color: var(--ink); }
+.share button { margin-top: 6px; padding: 6px 12px; }
+.copybar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 20px 0; }
+.copybar p { margin: 0; flex: 1 1 100%; }
+.email-preview { background: #fff; color: #1B2A3A; padding: 28px; border: 1px solid var(--rule); border-radius: 8px; margin-bottom: 48px; }
+@media (max-width: 720px) { .topnav { gap: 12px; font-size: .9rem; } }

@@ -9,26 +9,29 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,800;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
-<link rel="canonical" href="https://insidercluster.net/">
+<!--HEAD-->
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <a class="brand" href="./">Insider Cluster</a>
-  <span class="updated"><span id="updated"></span> · <a href="/stock/">All stocks</a></span>
+  <a class="brand" href="/">Insider Cluster</a>
+  <!--NAV-->
 </div></header>
 <div class="sample" id="sample" hidden><div class="wrap">This preview uses sample data for made-up companies. Real filings appear once the site is running on GitHub.</div></div>
 
 <main class="wrap">
   <section class="intro">
     <h1>Who's buying their own company's stock</h1>
-    <p id="summary">Executives and directors must report their trades to the SEC within two business days. We read every filing and highlight the purchases worth a closer look.</p>
+    <p id="summary"><!--SUMMARY--></p>
+    <p class="asof"><span id="updated"><!--UPDATED--></span> · <a href="/today/">Today's filings</a> · <a href="/weekly/">This week's digest</a></p>
   </section>
 
   <section class="clusters" aria-labelledby="clusters-h">
     <h2 id="clusters-h">Several insiders buying the same stock</h2>
     <p class="sub">Three or more different insiders bought on the open market in the past 30 days. Each mark is one person.</p>
-    <ol class="cluster-list" id="clusters"></ol>
+    <ol class="cluster-list" id="clusters"><!--CLUSTERS--></ol>
   </section>
+
+  <!--SIGNUP-->
 
   <section class="ledger" aria-labelledby="ledger-h">
     <h2 id="ledger-h">Recent trades</h2>
@@ -49,13 +52,16 @@
       </select></label>
       <span class="count" id="count"></span>
     </div>
-    <div id="table"></div>
+    <div id="table"><!--TABLE--></div>
   </section>
+
+  <!--WAITLIST-->
 </main>
 
 <footer><div class="wrap">
+  <!--PROMO-->
   <p>Data comes from Form 4 filings on SEC EDGAR, updated every weekday morning. Open-market purchases and sales only; option exercises, grants and gifts are left out. Trades whose price per share looks mistyped in the filing are set aside, and the same trade filed twice is shown once.</p>
-  <p><a href="/stock/">Browse every stock with insider trades</a>.</p>
+  <p><a href="/stock/">Browse every stock with insider trades</a>, read the <a href="/weekly/">weekly digest</a> or follow the <a href="/feed.xml">RSS feed</a>.</p>
   <p>This is information, not investment advice. Insiders buy for many reasons, and a purchase doesn't mean the stock will rise.</p>
 </div></footer>
 

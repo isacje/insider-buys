@@ -17,9 +17,15 @@ Live at https://insidercluster.net. A free website showing which executives and 
    | Pre-scheduled 10b5-1 plan | −1 |
 
    6+ points is **High**, 4+ is **Medium**. Each buy shows the reasons behind its score.
-4. **Publish** (`site/index.html`): the homepage, which reads `site/data/insiders.json`.
-   `pipeline/pages.py` also writes a plain-HTML page per stock (`/stock/GME/`), an A-Z list (`/stock/`), `sitemap.xml` and `robots.txt`, so search engines can index every stock.
-5. **Automate** (`.github/workflows/update.yml`): GitHub Actions runs everything each weekday morning, saves new filing days in `data/days/`, and deploys the site to GitHub Pages.
+4. **Publish** (`pipeline/build.py`): builds the whole site into `site/`:
+   - the homepage from `templates/index.html`, with clusters and top buys already in the HTML
+   - a page per stock (`/stock/GME/`) and an A-Z list (`/stock/`)
+   - daily recaps (`/today/`, `/daily/2026-10-20/`) and weekly digests (`/weekly/2026-W42/`)
+   - a ready-to-send newsletter for each week (`/weekly/2026-W42/email/`, not indexed)
+   - copy-and-paste social posts for the latest day (`/share/`, not indexed)
+   - link-preview images (`/og/`), `sitemap.xml`, `robots.txt`, `feed.xml` (RSS)
+   Settings live in `site.json`: the Kit form URLs, the Google Analytics ID and the SheetWise link. Anything left blank stays hidden.
+5. **Automate** (`.github/workflows/update.yml`): GitHub Actions runs everything each weekday morning, posts the day's top story to Bluesky (if the `BLUESKY_HANDLE` and `BLUESKY_APP_PASSWORD` secrets are set), saves new filing days in `data/days/`, deploys the site to GitHub Pages and pings IndexNow so Bing picks up new pages.
 
 ## Set it up on GitHub (about 15 minutes)
 

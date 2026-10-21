@@ -7,3 +7,11 @@ site/stock/
 site/sitemap.xml
 site/robots.txt
 site/CNAME
+site/index.html
+site/daily/
+site/weekly/
+site/today/
+site/share/
+site/og/
+site/feed.xml
+site/*.txt

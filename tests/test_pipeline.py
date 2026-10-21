@@ -179,26 +179,94 @@ def test_cluster_needs_three_insiders():
     assert data2["clusters"] == []
 
 
-def test_stock_pages(tmp_path=None):
-    import tempfile
-    from pathlib import Path
-    from pipeline.pages import build_pages
-    out = Path(tmp_path or tempfile.mkdtemp())
+def _cluster_rows():
     base = parse_form4(FORM4, "a", "2026-10-15")
     rows = []
     for i in range(3):  # a real cluster: different people, days and prices
         for r in base:
             rows.append({**r, "accession": f"a{i}", "insider_cik": str(i), "insider": f"Person {i}",
                          "date": f"2026-10-1{i}", "price": r["price"] + i,
-                         "value": r["shares"] * (r["price"] + i)})
-    rows.append({**base[0], "ticker": "../ETC", "accession": "z"})  # unsafe path is skipped
-    n = build_pages(rows, date(2026, 10, 15), out, "https://example.com", 90)
-    assert n == 1
-    page = (out / "stock" / "NWRB" / "index.html").read_text()
-    assert "<title>NWRB insider buying and selling" in page
-    assert "Cluster buying:" in page and "3 different insiders" in page
-    assert 'rel="canonical" href="https://example.com/stock/NWRB/"' in page
+                         "value": r["shares"] * (r["price"] + i), "filed": f"2026-10-1{i + 3}"})
+    return rows
+
+
+def test_full_site_build(tmp_path=None):
+    import tempfile
+    import xml.etree.ElementTree as ET
+    from pathlib import Path
+    from pipeline.build import build_site
+    out = Path(tmp_path or tempfile.mkdtemp())
+    rows = _cluster_rows() + [{**_cluster_rows()[0], "ticker": "../ETC", "accession": "z"}]
+    summary = build_site(rows, rows, date(2026, 10, 16), out)
+    assert summary["stock_pages"] == 1 and summary["latest_day"] == "2026-10-15"
+
+    stock = (out / "stock" / "NWRB" / "index.html").read_text()
+    assert "<title>NWRB insider buying and selling" in stock
+    assert "Cluster buying:" in stock and "3 different insiders" in stock
+    assert 'og:image" content="https://insidercluster.net/og/stock/NWRB.png"' in stock
+    assert sorted(p.name for p in (out / "stock").iterdir()) == ["NWRB", "index.html"]  # unsafe ticker skipped
+
+    home = (out / "index.html").read_text()
+    assert "<!--" not in home.split("<script>")[0].replace("<!doctype", "")  # every marker filled
+    assert 'class="cluster"' in home and "/stock/NWRB/" in home
+
+    assert (out / "daily" / "2026-10-15" / "index.html").exists()
+    assert (out / "today" / "index.html").exists()
+    assert (out / "weekly" / "2026-W42" / "email" / "index.html").exists()
+    assert 'name="robots" content="noindex"' in (out / "share" / "index.html").read_text()
+    for img in ("home.png", "stock/NWRB.png", "daily/2026-10-15.png", "weekly/2026-W42.png"):
+        assert (out / "og" / img).stat().st_size > 5000
+
     sitemap = (out / "sitemap.xml").read_text()
-    assert "https://example.com/stock/NWRB/" in sitemap and sitemap.count("<loc>") == 3
-    assert "Sitemap: https://example.com/sitemap.xml" in (out / "robots.txt").read_text()
-    assert sorted(p.name for p in (out / "stock").iterdir()) == ["NWRB", "index.html"]
+    assert "/daily/2026-10-15/" in sitemap and "/weekly/2026-W42/" in sitemap and "/share/" not in sitemap
+    ET.fromstring((out / "feed.xml").read_text())  # valid XML
+    assert "Disallow: /share/" in (out / "robots.txt").read_text()
+
+
+def test_post_text_limits():
+    from pipeline.content import bluesky_text, x_post
+    from pipeline.social import link_facet
+    story = {"text": "Ünïcode name, CEO of Café Holdings ($CAFE), bought $1.2M of stock " + "x" * 400,
+             "url": "https://insidercluster.net/stock/CAFE/"}
+    x = x_post(story)
+    assert len(x) - len(story["url"]) + 23 <= 280
+    text, shown = bluesky_text(story)
+    assert len(text) <= 300 and text.endswith(shown)
+    f = link_facet(text, shown, story["url"])
+    raw = text.encode("utf-8")
+    assert raw[f["index"]["byteStart"]:f["index"]["byteEnd"]].decode() == shown
+
+
+def test_bluesky_dry_run_and_dedupe():
+    import json
+    import tempfile
+    from pathlib import Path
+    import pipeline.social as social
+    from pipeline.pages import prepare
+    ds = prepare(_cluster_rows(), date(2026, 10, 16))
+    old = social.STATE
+    social.STATE = Path(tempfile.mkdtemp()) / "state.json"
+    try:
+        record = json.loads(social.post_to_bluesky(ds, Path("."), dry_run=True))
+        assert "NWRB" in record["text"] and record["facets"]
+        social.save_state({"bluesky_last_day": "2026-10-15", "bluesky_posted": []})
+        import os
+        os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_APP_PASSWORD"] = "x", "y"
+        assert "Already posted" in social.post_to_bluesky(ds, Path("."))
+    finally:
+        social.STATE = old
+        os.environ.pop("BLUESKY_HANDLE", None); os.environ.pop("BLUESKY_APP_PASSWORD", None)
+
+
+def test_signup_hidden_until_connected():
+    from pipeline import layout
+    cfg = layout.config()
+    saved = cfg.get("kit_form_action")
+    try:
+        cfg["kit_form_action"] = ""
+        assert layout.signup_block() == ""
+        cfg["kit_form_action"] = "https://app.kit.com/forms/123/subscriptions"
+        html = layout.signup_block()
+        assert 'name="email_address"' in html and "forms/123" in html
+    finally:
+        cfg["kit_form_action"] = saved

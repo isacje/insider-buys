@@ -7,7 +7,7 @@ on:
     - cron: "15 11 * * 2-6"
   push:
     branches: [main]
-    paths: ["site/**", "pipeline/**", ".github/workflows/**"]
+    paths: ["site/**", "pipeline/**", "templates/**", "assets/**", "site.json", "requirements.txt", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       days:
@@ -50,17 +50,25 @@ jobs:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
         run: python -m pipeline.run update --days ${{ github.event.inputs.days || '7' }}
 
+      - name: Build website data
+        run: python -m pipeline.run build
+
+      - name: Post the day's top story to Bluesky
+        if: github.event_name != 'push'
+        continue-on-error: true
+        env:
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+        run: python -m pipeline.run notify --bluesky
+
       - name: Save new filing days to the repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/days
+          git add data
           git diff --cached --quiet || git commit -m "Add insider filings through $(date -u +%F)"
           git pull --rebase --autostash origin main
           git push
-
-      - name: Build website data
-        run: python -m pipeline.run build
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
@@ -68,6 +76,11 @@ jobs:
           path: site
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      - name: Tell search engines about new pages (IndexNow)
+        if: github.event_name != 'push'
+        continue-on-error: true
+        run: python -m pipeline.run notify --indexnow
 
       - name: Flag a failed download
         if: steps.fetch.outcome == 'failure'

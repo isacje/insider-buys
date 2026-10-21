@@ -100,7 +100,9 @@ def demo(folder: Path, as_of: date) -> None:
     for p in sorted(folder.glob("*.xml")):
         meta = json.loads(p.with_suffix(".json").read_text()) if p.with_suffix(".json").exists() else {}
         rows += parse_form4(p.read_text(), meta.get("accession", p.stem), meta.get("filed", as_of.isoformat()))
-    data = build_site_data(rows, as_of)
+    from .build import build_site
+    print(build_site(rows, rows, as_of, ROOT / "site"))
+    data = json.loads(SITE_DATA.read_text())
     data["sample"] = True
     write_site_data(data)
 
@@ -111,8 +113,12 @@ def main() -> None:
     u = sub.add_parser("update", help="download missing filing days from SEC")
     u.add_argument("--days", type=int, default=5)
     u.add_argument("--max-filings", type=int, help="test with a few filings (not saved)")
-    b = sub.add_parser("build", help="rebuild the website data file")
+    b = sub.add_parser("build", help="rebuild the whole website")
     b.add_argument("--window", type=int, default=30)
+    n = sub.add_parser("notify", help="post to Bluesky and ping IndexNow after a build")
+    n.add_argument("--bluesky", action="store_true")
+    n.add_argument("--indexnow", action="store_true")
+    n.add_argument("--dry-run", action="store_true")
     d = sub.add_parser("demo", help="build site data from local sample XML")
     d.add_argument("folder", type=Path)
     d.add_argument("--as-of", default=date.today().isoformat())
@@ -121,11 +127,26 @@ def main() -> None:
     if a.cmd == "update":
         update(a.days, a.max_filings)
     elif a.cmd == "build":
-        write_site_data(build_site_data(load_rows(a.window), date.today(), a.window))
-        from .pages import build_pages
-        n = build_pages(load_rows(PAGE_WINDOW), date.today(), ROOT / "site",
-                        os.environ.get("SITE_URL", "https://insidercluster.net"), PAGE_WINDOW)
-        print(f"Wrote {n} stock pages, the A-Z list and sitemap.xml")
+        from .build import build_site
+        summary = build_site(load_rows(a.window), load_rows(PAGE_WINDOW), date.today(),
+                             ROOT / "site", a.window, PAGE_WINDOW)
+        print("Built site: " + ", ".join(f"{k}={v}" for k, v in summary.items()))
+    elif a.cmd == "notify":
+        from .pages import prepare
+        from .social import indexnow, post_to_bluesky
+        site_dir = ROOT / "site"
+        if a.bluesky:
+            ds = prepare(load_rows(PAGE_WINDOW), date.today(), PAGE_WINDOW)
+            try:
+                print(post_to_bluesky(ds, site_dir, dry_run=a.dry_run))
+            except Exception as err:  # never fail the daily update over a social post
+                print(f"Bluesky post failed: {err}")
+        if a.indexnow:
+            changed = json.loads((site_dir / "data" / "changed.json").read_text())
+            try:
+                print(indexnow(changed) if not a.dry_run else f"IndexNow would send {len(changed)} URLs")
+            except Exception as err:
+                print(f"IndexNow failed: {err}")
     else:
         demo(a.folder, date.fromisoformat(a.as_of))
 

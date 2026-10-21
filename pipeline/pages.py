@@ -1,90 +1,75 @@
-"""Generate a static page per stock, an A-Z stock list, a sitemap and robots.txt.
+"""Stock pages, the A-Z list, and the shared data preparation every page uses.
 
-Each page is plain HTML (no JavaScript needed), so search engines can read
-it directly. Pages are rebuilt from scratch on every run.
+Pages are plain HTML (no JavaScript needed), so search engines can read
+them directly. They are rebuilt from scratch on every run.
 """
 from __future__ import annotations
 
-import html
 import re
 import shutil
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
+from .layout import config, e, fmt_day, money, nice_company, page, sec_url
 from .signals import (find_clusters, flag_bad_prices, flag_plan_purchases,
                       group_trades, score_buy)
 
-SITE_NAME = "Insider Cluster"
 SAFE_TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,9}$")
 NEGATIVE_REASON = re.compile(r"scheduled|indirectly|plan\)", re.I)
+CLUSTER_WINDOW = 30
 
 
-def money(v: float) -> str:
-    v = v or 0
-    if v >= 1e9:
-        return f"${v / 1e9:.1f}B"
-    if v >= 1e6:
-        return f"${v / 1e6:.1f}M"
-    if v >= 1e3:
-        return f"${v / 1e3:,.0f}K"
-    return f"${v:,.0f}"
+@dataclass
+class Dataset:
+    as_of: date
+    window_days: int
+    buys: list[dict]
+    sells: list[dict]
+    clusters: dict[str, dict]          # current clusters, by ticker
+    days: list[str] = field(default_factory=list)   # filing days with data, ascending
+
+    def safe(self, trades: list[dict]) -> list[dict]:
+        return [t for t in trades if SAFE_TICKER.match(t["ticker"])]
 
 
-def fmt_day(s: str) -> str:
-    try:
-        d = date.fromisoformat(s)
-    except (TypeError, ValueError):
-        return s or ""
-    return f"{d:%b} {d.day}, {d.year}"
+def prepare(rows: list[dict], as_of: date, window_days: int = 90) -> Dataset:
+    """Clean, de-duplicate, flag and score every trade once for all pages."""
+    trades = group_trades(rows)
+    bad = {id(t) for t in flag_bad_prices(trades)}
+    # Say how far back the data really goes (the archive starts small and grows).
+    earliest = min((t["filed"] for t in trades), default=as_of.isoformat())
+    window_days = max(1, min(window_days, (as_of - date.fromisoformat(earliest)).days))
+    start = (as_of - timedelta(days=window_days)).isoformat()
+    recent = [t for t in trades if t["filed"] >= start and id(t) not in bad and t["value"] > 0]
+    buys = [t for t in recent if t["side"] == "buy"]
+    sells = [t for t in recent if t["side"] == "sell"]
+
+    flag_plan_purchases(buys)
+    c_start = (as_of - timedelta(days=CLUSTER_WINDOW)).isoformat()
+    clusters = {c["ticker"]: c for c in find_clusters(
+        [b for b in buys if b["filed"] >= c_start], as_of)}
+    for b in buys:
+        # a buy only earns "other insiders buying" if it's inside the current cluster window
+        score_buy(b, set(clusters) if b["trade_date"] >= c_start else set())
+    days = sorted({t["filed"] for t in recent})
+    return Dataset(as_of, window_days, buys, sells, clusters, days)
 
 
-def sec_url(t: dict) -> str:
-    acc = t["accession"]
-    return (f"https://www.sec.gov/Archives/edgar/data/{t['issuer_cik']}/"
-            f"{acc.replace('-', '')}/{acc}-index.htm")
+def clusters_as_of(ds: Dataset, day: str) -> dict[str, dict]:
+    """Clusters as they stood at the end of a given filing day."""
+    d = date.fromisoformat(day)
+    start = (d - timedelta(days=CLUSTER_WINDOW)).isoformat()
+    return {c["ticker"]: c for c in find_clusters(
+        [b for b in ds.buys if start <= b["filed"] <= day], d)}
 
 
-def nice_company(name: str) -> str:
-    """'FULLER H B CO' -> 'Fuller H B Co'; leave mixed-case names alone."""
-    return name.title() if name.isupper() else name
+def stock_link(ticker: str) -> str:
+    return f'<a class="ticker-link" href="/stock/{e(ticker)}/">{e(ticker)}</a>'
 
 
-e = html.escape
-
-
-def page(title: str, description: str, canonical: str, body: str) -> str:
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{e(title)}</title>
-<meta name="description" content="{e(description)}">
-<link rel="canonical" href="{e(canonical)}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,800;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-<header class="top"><div class="wrap">
-  <a class="brand" href="/">{SITE_NAME}</a>
-  <a class="updated" href="/stock/">All stocks</a>
-</div></header>
-<main class="wrap">
-{body}
-</main>
-<footer><div class="wrap">
-  <p>Data comes from Form 4 filings on SEC EDGAR, updated every weekday morning. Open-market purchases and sales only; option exercises, grants and gifts are left out.</p>
-  <p>This is information, not investment advice. Insiders buy and sell for many reasons, and a trade doesn't predict where the stock will go.</p>
-</div></footer>
-</body>
-</html>
-"""
-
-
-def trade_table(trades: list[dict], side: str) -> str:
+def trade_table(trades: list[dict], side: str, show_stock: bool = False) -> str:
     if not trades:
         return ('<div class="empty">No open-market '
                 f'{"purchases" if side == "buy" else "sales"} by insiders in this period.</div>')
@@ -107,20 +92,38 @@ def trade_table(trades: list[dict], side: str) -> str:
                       f'{"Pre-scheduled" if t["plan_10b5_1"] else "Not pre-scheduled"}</span>')
         also = f"<br>Also reported by {e(t['also_reported_by'])}" if t.get("also_reported_by") else ""
         price = f"${t['avg_price']:,.2f}" if t.get("avg_price") is not None else "–"
+        stock = (f'<td data-col="stock"><div class="t-ticker">{stock_link(t["ticker"])}</div>'
+                 f'<div class="t-company">{e(nice_company(t["company"]))}</div></td>') if show_stock else ""
         rows.append(f"""<tr>
-  <td data-col="insider"><div class="t-insider">{e(t['insider'])}</div><div class="t-role">{e(t['title'] or t['role'])}{also}</div></td>
+  {stock}<td data-col="insider"><div class="t-insider">{e(t['insider'])}</div><div class="t-role">{e(t['title'] or t['role'])}{also}</div></td>
   <td class="num" data-col="value"><strong>{money(t['value'])}</strong><div class="t-date">{t['shares']:,} sh @ {price}</div></td>
   <td class="num" data-col="change">{change}</td>
   <td data-col="why">{signal}</td>
   <td data-col="dates" class="t-date">{fmt_day(t['trade_date'])}<br><a href="{sec_url(t)}" rel="nofollow noopener" target="_blank">Filed {fmt_day(t['filed'])}</a></td>
 </tr>""")
     head = "Signal" if side == "buy" else "Plan"
-    return (f'<table><thead><tr><th>Insider</th><th class="num">Value</th><th class="num">Holdings</th>'
+    stock_th = "<th>Stock</th>" if show_stock else ""
+    return (f'<table><thead><tr>{stock_th}<th>Insider</th><th class="num">Value</th><th class="num">Holdings</th>'
             f'<th>{head}</th><th>Traded / filed</th></tr></thead><tbody>{"".join(rows)}</tbody></table>')
 
 
+def stock_summary(ticker: str, buys: list[dict], sells: list[dict]) -> str:
+    """One line used in descriptions and link previews."""
+    buyers = {b["insider_cik"] for b in buys}
+    sellers = {s["insider_cik"] for s in sells}
+    buy_v = sum(b["value"] for b in buys)
+    sell_v = sum(s["value"] for s in sells)
+    if buys and sells:
+        return (f"{len(buyers)} insider{'s' if len(buyers) != 1 else ''} bought {money(buy_v)} and "
+                f"{len(sellers)} sold {money(sell_v)}")
+    if buys:
+        return f"{len(buyers)} insider{'s' if len(buyers) != 1 else ''} bought {money(buy_v)}"
+    return f"{len(sellers)} insider{'s' if len(sellers) != 1 else ''} sold {money(sell_v)}"
+
+
 def stock_page(ticker: str, buys: list[dict], sells: list[dict], cluster: dict | None,
-               window_days: int, site_url: str) -> str:
+               window_days: int, has_image: bool) -> str:
+    site_url = config()["site_url"]
     company = nice_company((buys or sells)[0]["company"])
     buyers = {b["insider_cik"] for b in buys}
     sellers = {s["insider_cik"] for s in sells}
@@ -147,15 +150,10 @@ def stock_page(ticker: str, buys: list[dict], sells: list[dict], cluster: dict |
                    f'different insiders bought {money(cluster["total_value"])} between '
                    f'{fmt_day(cluster["first_date"])} and {fmt_day(cluster["last_date"])}.</p>')
 
-    if buys and sells:
-        desc_core = f"{len(buyers)} insiders bought {money(buy_v)} and {len(sellers)} sold {money(sell_v)}"
-    elif buys:
-        desc_core = f"{len(buyers)} insider{'s' if len(buyers) != 1 else ''} bought {money(buy_v)}"
-    else:
-        desc_core = f"{len(sellers)} insider{'s' if len(sellers) != 1 else ''} sold {money(sell_v)}"
-    description = (f"{ticker} ({company}) insider trading from SEC Form 4 filings: {desc_core} "
-                   f"in the past {window_days} days. Every trade by executives and directors, updated daily.")
-    title = f"{ticker} insider buying and selling: {company} | {SITE_NAME}"
+    description = (f"{ticker} ({company}) insider trading from SEC Form 4 filings: "
+                   f"{stock_summary(ticker, buys, sells)} in the past {window_days} days. "
+                   "Every trade by executives and directors, updated daily.")
+    title = f"{ticker} insider buying and selling: {company} | {config()['site_name']}"
 
     body = f"""<nav class="crumbs"><a href="/">Home</a> / <a href="/stock/">All stocks</a> / {e(ticker)}</nav>
 <section class="stock-head">
@@ -168,14 +166,16 @@ def stock_page(ticker: str, buys: list[dict], sells: list[dict], cluster: dict |
   <h2 id="buys-h">Insider purchases</h2>
   {trade_table(buys, "buy")}
 </section>
-<section class="block ledger" aria-labelledby="sells-h">
+<section class="block" aria-labelledby="sells-h">
   <h2 id="sells-h">Insider sales</h2>
   {trade_table(sells, "sell")}
 </section>"""
-    return page(title, description, f"{site_url}/stock/{ticker}/", body)
+    image = f"{site_url}/og/stock/{ticker}.png" if has_image else None
+    return page(title, description, f"{site_url}/stock/{ticker}/", body, image=image)
 
 
-def az_page(index: list[tuple[str, str, int, int]], site_url: str) -> str:
+def az_page(index: list[tuple[str, str, int, int]]) -> str:
+    site_url = config()["site_url"]
     items, letter = [], None
     for ticker, company, nb, ns in index:
         first = ticker[0] if ticker[0].isalpha() else "#"
@@ -192,35 +192,16 @@ def az_page(index: list[tuple[str, str, int, int]], site_url: str) -> str:
   <p class="lede">{len(index):,} stocks where executives, directors or large shareholders bought or sold shares on the open market recently.</p>
 </section>
 <ul class="az">{"".join(items)}</ul>"""
-    return page(f"All stocks with recent insider trades | {SITE_NAME}",
+    return page(f"All stocks with recent insider trades | {config()['site_name']}",
                 "A to Z list of every stock with recent insider buying or selling, from SEC Form 4 filings.",
                 f"{site_url}/stock/", body)
 
 
-def build_pages(rows: list[dict], as_of: date, site_dir: Path, site_url: str,
-                window_days: int = 90, cluster_window: int = 30) -> int:
-    trades = group_trades(rows)
-    bad = {id(t) for t in flag_bad_prices(trades)}
-    # Say how far back the data really goes (the archive starts small and grows).
-    earliest = min((t["filed"] for t in trades), default=as_of.isoformat())
-    window_days = max(1, min(window_days, (as_of - date.fromisoformat(earliest)).days))
-    start = (as_of - timedelta(days=window_days)).isoformat()
-    recent = [t for t in trades if t["filed"] >= start and id(t) not in bad and t["value"] > 0]
-    buys = [t for t in recent if t["side"] == "buy"]
-    sells = [t for t in recent if t["side"] == "sell"]
-
-    flag_plan_purchases(buys)
-    c_start = (as_of - timedelta(days=cluster_window)).isoformat()
-    clusters = {c["ticker"]: c for c in find_clusters(
-        [b for b in buys if b["filed"] >= c_start], as_of)}
-    for b in buys:
-        # a buy only earns "other insiders buying" if it's inside the current cluster window
-        score_buy(b, set(clusters) if b["trade_date"] >= c_start else set())
-
+def build_stock_pages(ds: Dataset, site_dir: Path, images: set[str]) -> list[str]:
+    """Write /stock/TICKER/ pages and the A-Z list. Returns the tickers written."""
     by_ticker: dict[str, dict[str, list]] = defaultdict(lambda: {"buy": [], "sell": []})
-    for t in buys + sells:
-        if SAFE_TICKER.match(t["ticker"]):
-            by_ticker[t["ticker"]][t["side"]].append(t)
+    for t in ds.safe(ds.buys + ds.sells):
+        by_ticker[t["ticker"]][t["side"]].append(t)
 
     out = site_dir / "stock"
     if out.exists():
@@ -233,17 +214,15 @@ def build_pages(rows: list[dict], as_of: date, site_dir: Path, site_url: str,
         s = sorted(by_ticker[ticker]["sell"], key=lambda t: (t["trade_date"], t["value"]), reverse=True)
         d = out / ticker
         d.mkdir()
-        (d / "index.html").write_text(stock_page(ticker, b, s, clusters.get(ticker), window_days, site_url))
+        (d / "index.html").write_text(stock_page(ticker, b, s, ds.clusters.get(ticker),
+                                                 ds.window_days, ticker in images))
         index.append((ticker, nice_company((b or s)[0]["company"]), len(b), len(s)))
+    (out / "index.html").write_text(az_page(index))
+    return [t for t, *_ in index]
 
-    (out / "index.html").write_text(az_page(index, site_url))
 
-    urls = [f"{site_url}/", f"{site_url}/stock/"] + [f"{site_url}/stock/{t}/" for t, *_ in index]
-    (site_dir / "sitemap.xml").write_text(
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "".join(f"  <url><loc>{e(u)}</loc><lastmod>{as_of.isoformat()}</lastmod></url>\n" for u in urls)
-        + "</urlset>\n")
-    (site_dir / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {site_url}/sitemap.xml\n")
-    (site_dir / "CNAME").write_text(site_url.split("://", 1)[-1] + "\n")
-    return len(index)
+def stock_groups(ds: Dataset) -> dict[str, dict[str, list]]:
+    by_ticker: dict[str, dict[str, list]] = defaultdict(lambda: {"buy": [], "sell": []})
+    for t in ds.safe(ds.buys + ds.sells):
+        by_ticker[t["ticker"]][t["side"]].append(t)
+    return by_ticker
