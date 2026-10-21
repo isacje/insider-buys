@@ -13,6 +13,10 @@ on:
       days:
         description: "How many days back to fetch (use 35 for the first run)"
         default: "7"
+      newsletter_draft:
+        description: "Also save this week's email in Kit as a draft (for testing)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -60,6 +64,17 @@ jobs:
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
         run: python -m pipeline.run notify --bluesky
+
+      - name: Schedule the weekly email in Kit (Saturdays)
+        if: github.event_name != 'push'
+        continue-on-error: true
+        env:
+          KIT_API_KEY: ${{ secrets.KIT_API_KEY }}
+        run: |
+          python -m pipeline.run notify --newsletter
+          if [ "${{ github.event.inputs.newsletter_draft }}" = "true" ]; then
+            python -m pipeline.run notify --newsletter-draft
+          fi
 
       - name: Save new filing days to the repo
         run: |

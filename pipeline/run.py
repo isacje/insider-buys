@@ -118,6 +118,8 @@ def main() -> None:
     n = sub.add_parser("notify", help="post to Bluesky and ping IndexNow after a build")
     n.add_argument("--bluesky", action="store_true")
     n.add_argument("--indexnow", action="store_true")
+    n.add_argument("--newsletter", action="store_true", help="on Saturdays, schedule the weekly email in Kit")
+    n.add_argument("--newsletter-draft", action="store_true", help="save this week's email in Kit as a draft now")
     n.add_argument("--dry-run", action="store_true")
     d = sub.add_parser("demo", help="build site data from local sample XML")
     d.add_argument("folder", type=Path)
@@ -141,6 +143,13 @@ def main() -> None:
                 print(post_to_bluesky(ds, site_dir, dry_run=a.dry_run))
             except Exception as err:  # never fail the daily update over a social post
                 print(f"Bluesky post failed: {err}")
+        if a.newsletter or a.newsletter_draft:
+            from .newsletter import send_weekly
+            ds = prepare(load_rows(PAGE_WINDOW), date.today(), PAGE_WINDOW)
+            try:
+                print(send_weekly(ds, date.today(), draft_now=a.newsletter_draft, dry_run=a.dry_run))
+            except Exception as err:
+                print(f"Newsletter failed: {err}")
         if a.indexnow:
             changed = json.loads((site_dir / "data" / "changed.json").read_text())
             try:

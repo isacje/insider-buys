@@ -270,3 +270,36 @@ def test_signup_hidden_until_connected():
         assert 'name="email_address"' in html and "forms/123" in html
     finally:
         cfg["kit_form_action"] = saved
+
+
+def test_newsletter_schedule():
+    from datetime import date
+    from pipeline.newsletter import due_week, monday_after
+    from pipeline.pages import prepare
+    ds = prepare(_cluster_rows(), date(2026, 10, 16))   # data through Thu Oct 15
+    assert due_week(ds, date(2026, 10, 15)) is None      # Thursday: not newsletter day
+    assert due_week(ds, date(2026, 10, 17)) == "2026-W42"  # Saturday after
+    assert due_week(ds, date(2026, 10, 24)) is None      # a week later: stale data, don't send
+    m = monday_after(date(2026, 10, 17))
+    assert (m.year, m.month, m.day, m.hour) == (2026, 10, 19, 12)
+
+
+def test_newsletter_skips_without_key_and_dedupes():
+    import os, tempfile
+    from datetime import date
+    from pathlib import Path
+    import pipeline.social as social
+    from pipeline.newsletter import send_weekly
+    from pipeline.pages import prepare
+    ds = prepare(_cluster_rows(), date(2026, 10, 16))
+    old = social.STATE
+    social.STATE = Path(tempfile.mkdtemp()) / "state.json"
+    try:
+        os.environ.pop("KIT_API_KEY", None)
+        assert "not connected" in send_weekly(ds, date(2026, 10, 17))
+        os.environ["KIT_API_KEY"] = "test"
+        social.save_state({"bluesky_last_day": "", "bluesky_posted": [], "newsletter_weeks": ["2026-W42"]})
+        assert "already created" in send_weekly(ds, date(2026, 10, 17))
+    finally:
+        social.STATE = old
+        os.environ.pop("KIT_API_KEY", None)
