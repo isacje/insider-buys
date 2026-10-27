@@ -99,9 +99,9 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .up { color: var(--buy); }
 .empty { padding: 32px; text-align: center; color: var(--ink-soft); background: var(--sheet); border: 1px dashed var(--rule); border-radius: 8px; }
 
-footer { border-top: 1px solid var(--rule); color: var(--ink-soft); font-size: .85rem; }
+footer { border-top: 1px solid var(--rule); color: var(--ink-soft); font-size: .85rem; text-align: center; }
 footer .wrap { padding-top: 20px; padding-bottom: 40px; max-width: 1080px; }
-footer p { max-width: 75ch; margin: 0 0 8px; }
+footer p { max-width: 75ch; margin: 0 auto 8px; }
 
 @media (max-width: 720px) {
   .cluster { grid-template-columns: 1fr auto; }
@@ -155,7 +155,7 @@ footer p { max-width: 75ch; margin: 0 0 8px; }
 .signup-row button, .copybar button, .share button { font: inherit; font-weight: 600; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); cursor: pointer; }
 .signup .fine { font-size: .8rem; margin: 10px 0 0; }
 .waitlist { border-left-color: var(--buy); }
-.promo { margin: 0 0 16px; padding: 12px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; max-width: 75ch; }
+.promo { margin: 0 auto 16px; padding: 12px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; max-width: 75ch; }
 .promo p { margin: 0; }
 .story-list { list-style: none; padding: 0; margin: 0; border-top: 2px solid var(--ink); }
 .story-list li { padding: 12px 0; border-bottom: 1px solid var(--rule); }
