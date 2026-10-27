@@ -1,10 +1,11 @@
 {
- "bluesky_last_day": "2026-10-23",
+ "bluesky_last_day": "2026-10-26",
  "bluesky_posted": [
   "2026-10-20:cluster:DX",
   "2026-10-21:cluster:DX",
   "2026-10-22:cluster:RAPP",
-  "2026-10-23:cluster:RAPP"
+  "2026-10-23:cluster:RAPP",
+  "2026-10-26:cluster:BPRE"
  ],
  "newsletter_weeks": [
   "2026-W43"
