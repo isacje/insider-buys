@@ -1,5 +1,5 @@
 {
- "bluesky_last_day": "2026-11-10",
+ "bluesky_last_day": "2026-11-12",
  "bluesky_posted": [
   "2026-10-20:cluster:DX",
   "2026-10-21:cluster:DX",
@@ -16,7 +16,8 @@
   "2026-11-05:cluster:UPBD",
   "2026-11-06:cluster:MTDR",
   "2026-11-09:cluster:MTDR",
-  "2026-11-10:cluster:MTDR"
+  "2026-11-10:cluster:MTDR",
+  "2026-11-12:cluster:MTDR"
  ],
  "newsletter_weeks": [
   "2026-W43",
